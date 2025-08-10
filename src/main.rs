@@ -90,11 +90,7 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-fn spawn_initial_piece(
-    mut commands: Commands,
-    game_map: Res<GameMap>,
-    mut game_state: ResMut<NextState<GameState>>,
-) {
+fn spawn_piece(commands: &mut Commands, game_map: &GameMap, game_state: &mut NextState<GameState>) {
     let new_piece = Piece::random();
     let initial_position = Position {
         x: NUM_BLOCKS_X as isize / 2 - 1,
@@ -103,11 +99,19 @@ fn spawn_initial_piece(
 
     if can_move(&new_piece, &initial_position, initial_position.y, &game_map) {
         commands.spawn((new_piece, initial_position));
-        println!("Spawned initial piece (random)");
+        println!("Spawned new piece");
     } else {
         println!("Game Over! Cannot spawn new piece.");
         game_state.set(GameState::GameOver);
     }
+}
+
+fn spawn_initial_piece(
+    mut commands: Commands,
+    game_map: Res<GameMap>,
+    mut game_state: ResMut<NextState<GameState>>,
+) {
+    spawn_piece(&mut commands, &game_map, &mut game_state);
 }
 
 // System to draw blocks
@@ -190,6 +194,7 @@ fn move_piece_down(
     mut commands: Commands,
     mut query_piece: Query<(Entity, &mut Piece, &mut Position)>,
     mut game_map: ResMut<GameMap>, // Make game_map mutable
+    mut game_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok((entity, piece, mut position)) = query_piece.get_single_mut() {
         let new_y = position.y + 1;
@@ -215,15 +220,7 @@ fn move_piece_down(
                 }
             }
             commands.entity(entity).despawn(); // Despawn the piece entity
-            // TODO: Trigger line clearing
-            commands.spawn((
-                // Spawn new piece
-                Piece::random(),
-                Position {
-                    x: NUM_BLOCKS_X as isize / 2 - 1,
-                    y: 0,
-                },
-            ));
+            spawn_piece(&mut commands, &game_map, &mut game_state);
             println!("Piece landed at y: {}", position.y);
             println!("Piece finalized and added to game map.");
         }
@@ -359,6 +356,7 @@ fn handle_input(
     mut query: Query<(Entity, &mut Position, &Piece)>,
     mut game_map: ResMut<GameMap>,
     mut score: ResMut<Score>,
+    mut game_state: ResMut<NextState<GameState>>,
 ) {
     if let Ok((entity, mut position, piece)) = query.get_single_mut() {
         if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowLeft) {
@@ -410,13 +408,7 @@ fn handle_input(
                 }
             }
             commands.entity(entity).despawn();
-            commands.spawn((
-                Piece::random(),
-                Position {
-                    x: NUM_BLOCKS_X as isize / 2 - 1,
-                    y: 0,
-                },
-            ));
+            spawn_piece(&mut commands, &game_map, &mut game_state);
         }
     }
 
@@ -488,7 +480,8 @@ fn setup_ui(mut commands: Commands) {
                 ..default()
             }),
             TextSection::new(
-                "\nLevel: ",
+                "
+Level: ",
                 TextStyle {
                     font_size: 40.0,
                     color: Color::WHITE,
@@ -527,21 +520,25 @@ struct GameOverMessage;
 
 // New system to set up Game Over UI
 fn setup_game_over_ui(mut commands: Commands) {
-    commands.spawn((
-        TextBundle::from_section(
-            "GAME OVER",
-            TextStyle {
-                font_size: 100.0,
-                color: Color::RED,
-                ..default()
-            },
-        )
-        .with_style(Style {
-            position_type: PositionType::Absolute,
-            top: Val::Percent(40.0),
-            left: Val::Percent(20.0),
+    let mut text_bundle = TextBundle::from_section(
+        "GAME OVER",
+        TextStyle {
+            font_size: 100.0,
+            color: Color::RED,
             ..default()
-        }),
+        },
+    )
+    .with_style(Style {
+        position_type: PositionType::Absolute,
+        top: Val::Percent(40.0),
+        left: Val::Percent(20.0),
+        ..default()
+    });
+
+    text_bundle.visibility = Visibility::Hidden;
+
+    commands.spawn((
+        text_bundle,
         GameOverMessage,
     ));
 }
