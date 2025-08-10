@@ -1,6 +1,6 @@
-use bevy::prelude::*;
 use crate::game_color::GameColor;
 use crate::game_constants::{NUM_BLOCKS_X, NUM_BLOCKS_Y};
+use bevy::prelude::*;
 
 pub type PieceMatrix = [[Presence; 4]; 4];
 
@@ -29,3 +29,5 @@ impl Default for GameMap {
         GameMap(vec![vec![Presence::No; NUM_BLOCKS_X]; NUM_BLOCKS_Y])
     }
 }
+
+impl GameMap {}

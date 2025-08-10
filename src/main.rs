@@ -7,8 +7,7 @@ use crate::game_types::{GameMap, PieceMatrix, PieceType, Presence};
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::*;
-use rand::Rng;
-use rand::thread_rng;
+use rand::{Rng, rng};
 use std::time::Duration;
 
 mod components;
@@ -77,6 +76,7 @@ fn main() {
                 update_score_display,
                 update_gravity_speed,
                 update_level_display,
+                display_game_over_message.run_if(in_state(GameState::GameOver)),
             ),
         ) // Add update_level_display here
         .add_systems(
@@ -148,7 +148,7 @@ fn draw_blocks(
 
     // Draw current piece blocks
     if let Ok((piece, position)) = query_piece.get_single() {
-        let piece_matrix = get_block_matrix(piece.states[piece.current_state]);
+        let piece_matrix = get_block_matrix(piece.states[piece.current_state], piece.color);
         for my in 0..4 {
             for mx in 0..4 {
                 if let Presence::Yes(color) = piece_matrix[my][mx] {
@@ -176,11 +176,11 @@ fn draw_blocks(
 }
 
 // Helper function to convert u16 to PieceMatrix (copied from original piece.rs)
-fn get_block_matrix(num: u16) -> PieceMatrix {
+fn get_block_matrix(num: u16, color: GameColor) -> PieceMatrix {
     let mut res = [[Presence::No; 4]; 4];
     for i in 0..16 {
         if num & (1u16 << (15 - i)) > 0 {
-            res[i / 4][i % 4] = Presence::Yes(GameColor::Red); // Default to Red for now, will use piece.color later
+            res[i / 4][i % 4] = Presence::Yes(color);
         }
     }
     res
@@ -198,7 +198,7 @@ fn move_piece_down(
             println!("Piece moved down to y: {}", position.y);
         } else {
             // Collision detected, finalize piece placement
-            let piece_matrix = get_block_matrix(piece.states[piece.current_state]);
+            let piece_matrix = get_block_matrix(piece.states[piece.current_state], piece.color);
             for my in 0..4 {
                 for mx in 0..4 {
                     if let Presence::Yes(color) = piece_matrix[my][mx] {
@@ -232,7 +232,7 @@ fn move_piece_down(
 
 // Helper function to check if a piece can move to a new position
 fn can_move(piece: &Piece, current_pos: &Position, new_y: isize, game_map: &GameMap) -> bool {
-    let piece_matrix = get_block_matrix(piece.states[piece.current_state]);
+    let piece_matrix = get_block_matrix(piece.states[piece.current_state], piece.color);
     for my in 0..4 {
         for mx in 0..4 {
             if let Presence::Yes(_) = piece_matrix[my][mx] {
@@ -305,8 +305,8 @@ impl From<PieceType> for Piece {
 
 impl Piece {
     pub fn random() -> Self {
-        let mut rng = thread_rng();
-        let piece_type = match rng.gen_range(0..7) {
+        let mut rng = rng();
+        let piece_type = match rng.random_range(0..7) {
             0 => PieceType::L,
             1 => PieceType::J,
             2 => PieceType::S,
@@ -325,7 +325,7 @@ fn can_move_horizontally(
     new_x: isize,
     game_map: &GameMap,
 ) -> bool {
-    let piece_matrix = get_block_matrix(piece.states[piece.current_state]);
+    let piece_matrix = get_block_matrix(piece.states[piece.current_state], piece.color);
     for my in 0..4 {
         for mx in 0..4 {
             if let Presence::Yes(_) = piece_matrix[my][mx] {
@@ -354,11 +354,13 @@ fn can_move_horizontally(
 }
 
 fn handle_input(
+    mut commands: Commands,
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut Position, &Piece)>,
-    game_map: Res<GameMap>,
+    mut query: Query<(Entity, &mut Position, &Piece)>,
+    mut game_map: ResMut<GameMap>,
+    mut score: ResMut<Score>,
 ) {
-    if let Ok((mut position, piece)) = query.get_single_mut() {
+    if let Ok((entity, mut position, piece)) = query.get_single_mut() {
         if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowLeft) {
             let new_x = position.x - 1;
             if can_move_horizontally(piece, &position, new_x, &game_map) {
@@ -371,16 +373,55 @@ fn handle_input(
                 position.x = new_x;
             }
         }
+        if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowDown) {
+            let new_y = position.y + 1;
+            if can_move(piece, &position, new_y, &game_map) {
+                position.y = new_y;
+            }
+        }
+
+        if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::Space) {
+            println!("Space key pressed");
+            let mut final_y = position.y;
+            while can_move(piece, &position, final_y + 1, &game_map) {
+                final_y += 1;
+            }
+
+            if final_y > position.y {
+                score.value += (final_y - position.y) as u32;
+                position.y = final_y;
+            }
+
+            // Lock the piece
+            let piece_matrix = get_block_matrix(piece.states[piece.current_state], piece.color);
+            for my in 0..4 {
+                for mx in 0..4 {
+                    if let Presence::Yes(color) = piece_matrix[my][mx] {
+                        let map_x = position.x + mx as isize;
+                        let map_y = position.y + my as isize;
+                        if map_x >= 0
+                            && map_x < NUM_BLOCKS_X as isize
+                            && map_y >= 0
+                            && map_y < NUM_BLOCKS_Y as isize
+                        {
+                            game_map.0[map_y as usize][map_x as usize] = Presence::Yes(color);
+                        }
+                    }
+                }
+            }
+            commands.entity(entity).despawn();
+            commands.spawn((
+                Piece::random(),
+                Position {
+                    x: NUM_BLOCKS_X as isize / 2 - 1,
+                    y: 0,
+                },
+            ));
+        }
     }
 
     if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowUp) {
         println!("Up key pressed");
-    }
-    if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowDown) {
-        println!("Down key pressed");
-    }
-    if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::Space) {
-        println!("Space key pressed");
     }
 }
 
