@@ -39,10 +39,10 @@ fn main() {
         .init_resource::<GameMap>()
         .init_resource::<Score>() // Add Score resource
         .init_state::<GameState>()
-        .add_systems(Startup, (setup_camera, spawn_initial_piece, setup_ui)) // Add setup_ui here
-        .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display)) // Add update_score_display here
+        .add_systems(Startup, (setup_camera, spawn_initial_piece, setup_ui, setup_game_over_ui)) // Add setup_game_over_ui here
+        .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display))
         .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
-        .insert_resource(Time::<Fixed>::from_seconds(1.0))
+        .add_systems(Update, display_game_over_message.run_if(in_state(GameState::GameOver))) // New system for game over message
         .run();
 }
 
@@ -344,6 +344,43 @@ fn update_score_display(score: Res<Score>, mut query_text: Query<&mut Text>) {
     if score.is_changed() {
         if let Some(mut text) = query_text.iter_mut().next() {
             text.sections[1].value = score.value.to_string();
+        }
+    }
+}
+
+// Component to mark the game over message
+#[derive(Component)]
+struct GameOverMessage;
+
+// New system to set up Game Over UI
+fn setup_game_over_ui(mut commands: Commands) {
+    commands.spawn((
+        TextBundle::from_section(
+            "GAME OVER",
+            TextStyle {
+                font_size: 100.0,
+                color: Color::RED,
+                ..default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(40.0),
+            left: Val::Percent(20.0),
+            ..default()
+        }),
+        GameOverMessage,
+    ));
+}
+
+// New system to display Game Over message
+fn display_game_over_message(
+    game_state: Res<State<GameState>>,
+    mut query_game_over_message: Query<&mut Visibility, With<GameOverMessage>>,
+) {
+    if game_state.get() == &GameState::GameOver {
+        if let Some(mut visibility) = query_game_over_message.iter_mut().next() {
+            *visibility = Visibility::Visible;
         }
     }
 }
