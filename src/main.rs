@@ -20,6 +20,11 @@ enum GameState {
     GameOver,
 }
 
+#[derive(Resource, Default)]
+pub struct Score {
+    pub value: u32,
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(GameColor::Gray.into()))
@@ -32,6 +37,7 @@ fn main() {
             ..default()
         }))
         .init_resource::<GameMap>()
+        .init_resource::<Score>() // Add Score resource
         .init_state::<GameState>()
         .add_systems(Startup, (setup_camera, spawn_initial_piece))
         .add_systems(Update, (handle_input, draw_blocks, clear_lines)) // Add clear_lines here
@@ -265,7 +271,7 @@ fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
 }
 
 // New system to clear full lines
-fn clear_lines(mut game_map: ResMut<GameMap>) {
+fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>) {
     let mut lines_cleared = 0;
     let mut rows_to_clear = Vec::new();
 
@@ -293,7 +299,7 @@ fn clear_lines(mut game_map: ResMut<GameMap>) {
     }
 
     if lines_cleared > 0 {
-        println!("Cleared {} lines!", lines_cleared);
-        // TODO: Update score
+        score.value += lines_cleared as u32 * 100; // Example scoring: 100 points per line
+        println!("Cleared {} lines! Current score: {}", lines_cleared, score.value);
     }
 }
