@@ -46,7 +46,7 @@ fn main() {
         .add_systems(Startup, (setup_camera, spawn_initial_piece, setup_ui, setup_game_over_ui)) // Add setup_game_over_ui here
         .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display))
         .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
-        .add_systems(Update, display_game_over_message.run_if(in_state(GameState::GameOver))) // New system for game over message
+        .add_systems(Update, display_game_over_message.run_if(in_state(GameState::GameOver)))
         .run();
 }
 
