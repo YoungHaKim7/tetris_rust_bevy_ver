@@ -39,8 +39,8 @@ fn main() {
         .init_resource::<GameMap>()
         .init_resource::<Score>() // Add Score resource
         .init_state::<GameState>()
-        .add_systems(Startup, (setup_camera, spawn_initial_piece))
-        .add_systems(Update, (handle_input, draw_blocks, clear_lines))
+        .add_systems(Startup, (setup_camera, spawn_initial_piece, setup_ui)) // Add setup_ui here
+        .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display)) // Add update_score_display here
         .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
         .insert_resource(Time::<Fixed>::from_seconds(1.0))
         .run();
@@ -309,5 +309,41 @@ fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>) {
     if lines_cleared > 0 {
         score.value += lines_cleared as u32 * 100; // Example scoring: 100 points per line
         println!("Cleared {} lines! Current score: {}", lines_cleared, score.value);
+    }
+}
+
+// New system to set up UI
+fn setup_ui(mut commands: Commands) {
+    commands.spawn(
+        TextBundle::from_sections([
+            TextSection::new(
+                "Score: ",
+                TextStyle {
+                    font_size: 40.0,
+                    color: Color::WHITE,
+                    ..default()
+                },
+            ),
+            TextSection::from_style(TextStyle {
+                font_size: 40.0,
+                color: Color::WHITE,
+                ..default()
+            }),
+        ])
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(10.0),
+            left: Val::Px(10.0),
+            ..default()
+        }),
+    );
+}
+
+// New system to update score display
+fn update_score_display(score: Res<Score>, mut query_text: Query<&mut Text>) {
+    if score.is_changed() {
+        if let Some(mut text) = query_text.iter_mut().next() {
+            text.sections[1].value = score.value.to_string();
+        }
     }
 }
