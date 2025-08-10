@@ -34,7 +34,7 @@ fn main() {
         .init_resource::<GameMap>()
         .init_state::<GameState>()
         .add_systems(Startup, (setup_camera, spawn_initial_piece))
-        .add_systems(Update, (handle_input, draw_blocks))
+        .add_systems(Update, (handle_input, draw_blocks, clear_lines)) // Add clear_lines here
         .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
         .insert_resource(Time::<Fixed>::from_seconds(1.0))
         .run();
@@ -261,5 +261,39 @@ fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
     }
     if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::Space) {
         println!("Space key pressed");
+    }
+}
+
+// New system to clear full lines
+fn clear_lines(mut game_map: ResMut<GameMap>) {
+    let mut lines_cleared = 0;
+    let mut rows_to_clear = Vec::new();
+
+    // Find full lines
+    for y in 0..NUM_BLOCKS_Y {
+        let mut is_full = true;
+        for x in 0..NUM_BLOCKS_X {
+            if let Presence::No = game_map.0[y][x] {
+                is_full = false;
+                break;
+            }
+        }
+        if is_full {
+            rows_to_clear.push(y);
+        }
+    }
+
+    // Clear lines and shift down
+    for &row_to_clear in rows_to_clear.iter().rev() { // Iterate in reverse to avoid index issues
+        lines_cleared += 1;
+        // Remove the full row
+        game_map.0.remove(row_to_clear);
+        // Add a new empty row at the top
+        game_map.0.insert(0, vec![Presence::No; NUM_BLOCKS_X]);
+    }
+
+    if lines_cleared > 0 {
+        println!("Cleared {} lines!", lines_cleared);
+        // TODO: Update score
     }
 }
