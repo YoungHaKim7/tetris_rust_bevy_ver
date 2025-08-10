@@ -7,6 +7,7 @@ use crate::components::{Piece, Position};
 use crate::game_color::GameColor;
 use rand::Rng;
 use rand::thread_rng;
+use std::time::Duration;
 
 mod game_constants;
 mod game_color;
@@ -25,9 +26,19 @@ pub struct Score {
     pub value: u32,
 }
 
+#[derive(Resource, Default)]
+pub struct Level {
+    pub value: u32,
+    pub lines_cleared_in_level: u32,
+}
+
 // New marker component for score display
 #[derive(Component)]
 struct ScoreDisplay;
+
+// New marker component for level display
+#[derive(Component)]
+struct LevelDisplay;
 
 fn main() {
     App::new()
@@ -42,11 +53,11 @@ fn main() {
         }))
         .init_resource::<GameMap>()
         .init_resource::<Score>() // Add Score resource
+        .init_resource::<Level>() // Add Level resource
         .init_state::<GameState>()
         .add_systems(Startup, (setup_camera, spawn_initial_piece, setup_ui, setup_game_over_ui)) // Add setup_game_over_ui here
-        .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display))
+        .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display, update_gravity_speed, update_level_display)) // Add update_level_display here
         .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
-        .add_systems(Update, display_game_over_message.run_if(in_state(GameState::GameOver)))
         .run();
 }
 
@@ -59,7 +70,7 @@ fn spawn_initial_piece(mut commands: Commands, game_map: Res<GameMap>, mut game_
     let initial_position = Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 };
 
     if can_move(&new_piece, &initial_position, initial_position.y, &game_map) {
-        commands.spawn((
+        commands.spawn(( 
             new_piece,
             initial_position,
         ));
@@ -283,7 +294,7 @@ fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
 }
 
 // New system to clear full lines
-fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>) {
+fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>, mut level: ResMut<Level>) { // Add level as a parameter
     let mut lines_cleared = 0;
     let mut rows_to_clear = Vec::new();
 
@@ -312,16 +323,34 @@ fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>) {
 
     if lines_cleared > 0 {
         score.value += lines_cleared as u32 * 100; // Example scoring: 100 points per line
+        level.lines_cleared_in_level += lines_cleared as u32;
+        if level.lines_cleared_in_level >= 10 { // Advance level every 10 lines
+            level.value += 1;
+            level.lines_cleared_in_level = 0;
+        }
         println!("Cleared {} lines! Current score: {}", lines_cleared, score.value);
     }
 }
 
 // New system to set up UI
 fn setup_ui(mut commands: Commands) {
-    commands.spawn((
+    commands.spawn(( 
         TextBundle::from_sections([
             TextSection::new(
                 "Score: ",
+                TextStyle {
+                    font_size: 40.0,
+                    color: Color::WHITE,
+                    ..default()
+                },
+            ),
+            TextSection::from_style(TextStyle {
+                font_size: 40.0,
+                color: Color::WHITE,
+                ..default()
+            }),
+            TextSection::new(
+                "\nLevel: ",
                 TextStyle {
                     font_size: 40.0,
                     color: Color::WHITE,
@@ -341,6 +370,7 @@ fn setup_ui(mut commands: Commands) {
             ..default()
         }),
         ScoreDisplay,
+        LevelDisplay,
     ));
 }
 
@@ -359,7 +389,7 @@ struct GameOverMessage;
 
 // New system to set up Game Over UI
 fn setup_game_over_ui(mut commands: Commands) {
-    commands.spawn((
+    commands.spawn(( 
         TextBundle::from_section(
             "GAME OVER",
             TextStyle {
@@ -386,6 +416,27 @@ fn display_game_over_message(
     if game_state.get() == &GameState::GameOver {
         if let Some(mut visibility) = query_game_over_message.iter_mut().next() {
             *visibility = Visibility::Visible;
+        }
+    }
+}
+
+// New system to update gravity speed based on level
+fn update_gravity_speed(
+    level: Res<Level>,
+    mut fixed_time: ResMut<Time<Fixed>>,
+) {
+    if level.is_changed() {
+        let new_speed = 1.0 - (level.value as f32 * 0.05); // Example: speed up by 5% per level
+        fixed_time.set_wrap_period(Duration::from_secs_f32(new_speed.max(0.1))); // Minimum speed
+        println!("Gravity speed updated to: {}s", new_speed.max(0.1));
+    }
+}
+
+// New system to update level display
+fn update_level_display(level: Res<Level>, mut query_text: Query<&mut Text, With<LevelDisplay>>) {
+    if level.is_changed() {
+        if let Some(mut text) = query_text.iter_mut().next() {
+            text.sections[3].value = level.value.to_string(); // Accessing index 3 for Level value
         }
     }
 }
