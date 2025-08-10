@@ -2,9 +2,11 @@ use bevy::prelude::*;
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
 use crate::game_constants::{TITLE, WIDTH, HEIGHT, NUM_BLOCKS_X, NUM_BLOCKS_Y, TEXTURE_SIZE};
-use crate::game_types::{GameMap, Presence, PieceMatrix};
+use crate::game_types::{GameMap, Presence, PieceMatrix, PieceType};
 use crate::components::{Piece, Position};
 use crate::game_color::GameColor;
+use rand::Rng;
+use rand::thread_rng;
 
 mod game_constants;
 mod game_color;
@@ -44,14 +46,10 @@ fn setup_camera(mut commands: Commands) {
 
 fn spawn_initial_piece(mut commands: Commands) {
     commands.spawn((
-        Piece {
-            states: [0b0000_0110_0110_0000, 0, 0, 0],
-            color: GameColor::Red,
-            current_state: 0,
-        },
+        Piece::random(),
         Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 },
     ));
-    println!("Spawned initial piece (placeholder)");
+    println!("Spawned initial piece (random)");
 }
 
 // System to draw blocks
@@ -149,7 +147,10 @@ fn move_piece_down(
             }
             commands.entity(entity).despawn(); // Despawn the piece entity
             // TODO: Trigger line clearing
-            // TODO: Spawn new piece
+            commands.spawn(( // Spawn new piece
+                Piece::random(),
+                Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 },
+            ));
             println!("Piece landed at y: {}", position.y);
             println!("Piece finalized and added to game map.");
         }
@@ -180,6 +181,69 @@ fn can_move(piece: &Piece, current_pos: &Position, new_y: isize, game_map: &Game
         }
     }
     true
+}
+
+// From<PieceType> for Piece implementation
+impl From<PieceType> for Piece {
+    fn from(piece_type: PieceType) -> Piece {
+        use self::PieceType::*;
+
+        let def = Piece::default();
+
+        match piece_type {
+            L => Piece {
+                states: [17504, 1856, 1570, 736],
+                color: GameColor::Orange,
+                ..def
+            },
+            J => Piece {
+                states: [8800, 1136, 1604, 3616],
+                color: GameColor::Blue,
+                ..def
+            },
+            S => Piece {
+                states: [17952, 1728, 17952, 1728],
+                color: GameColor::Green,
+                ..def
+            },
+            Z => Piece {
+                states: [9792, 3168, 9792, 3168],
+                color: GameColor::Red,
+                ..def
+            },
+            T => Piece {
+                states: [17984, 3648, 19520, 19968],
+                color: GameColor::Purple,
+                ..def
+            },
+            I => Piece {
+                states: [17476, 3840, 17476, 3840],
+                color: GameColor::Cyan,
+                ..def
+            },
+            O => Piece {
+                states: [1632, 1632, 1632, 1632],
+                color: GameColor::Yellow,
+                ..def
+            },
+        }
+    }
+}
+
+impl Piece {
+    pub fn random() -> Self {
+        let mut rng = thread_rng();
+        let piece_type = match rng.gen_range(0..7) {
+            0 => PieceType::L,
+            1 => PieceType::J,
+            2 => PieceType::S,
+            3 => PieceType::Z,
+            4 => PieceType::T,
+            5 => PieceType::I,
+            _ => PieceType::O,
+        };
+        Piece::from(piece_type)
+    }
 }
 
 fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
