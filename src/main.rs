@@ -40,7 +40,7 @@ fn main() {
         .init_resource::<Score>() // Add Score resource
         .init_state::<GameState>()
         .add_systems(Startup, (setup_camera, spawn_initial_piece))
-        .add_systems(Update, (handle_input, draw_blocks, clear_lines)) // Add clear_lines here
+        .add_systems(Update, (handle_input, draw_blocks, clear_lines))
         .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
         .insert_resource(Time::<Fixed>::from_seconds(1.0))
         .run();
@@ -50,12 +50,20 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-fn spawn_initial_piece(mut commands: Commands) {
-    commands.spawn((
-        Piece::random(),
-        Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 },
-    ));
-    println!("Spawned initial piece (random)");
+fn spawn_initial_piece(mut commands: Commands, game_map: Res<GameMap>, mut game_state: ResMut<NextState<GameState>>) {
+    let new_piece = Piece::random();
+    let initial_position = Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 };
+
+    if can_move(&new_piece, &initial_position, initial_position.y, &game_map) {
+        commands.spawn((
+            new_piece,
+            initial_position,
+        ));
+        println!("Spawned initial piece (random)");
+    } else {
+        println!("Game Over! Cannot spawn new piece.");
+        game_state.set(GameState::GameOver);
+    }
 }
 
 // System to draw blocks
