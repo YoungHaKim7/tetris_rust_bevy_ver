@@ -1,18 +1,18 @@
-use bevy::prelude::*;
-use bevy::input::ButtonInput;
-use bevy::input::keyboard::KeyCode;
-use crate::game_constants::{TITLE, WIDTH, HEIGHT, NUM_BLOCKS_X, NUM_BLOCKS_Y, TEXTURE_SIZE};
-use crate::game_types::{GameMap, Presence, PieceMatrix, PieceType};
 use crate::components::{Piece, Position};
 use crate::game_color::GameColor;
+use crate::game_constants::{HEIGHT, NUM_BLOCKS_X, NUM_BLOCKS_Y, TEXTURE_SIZE, TITLE, WIDTH};
+use crate::game_types::{GameMap, PieceMatrix, PieceType, Presence};
+use bevy::input::ButtonInput;
+use bevy::input::keyboard::KeyCode;
+use bevy::prelude::*;
 use rand::Rng;
 use rand::thread_rng;
 use std::time::Duration;
 
-mod game_constants;
-mod game_color;
-mod game_types;
 mod components;
+mod game_color;
+mod game_constants;
+mod game_types;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum GameState {
@@ -55,9 +55,30 @@ fn main() {
         .init_resource::<Score>() // Add Score resource
         .init_resource::<Level>() // Add Level resource
         .init_state::<GameState>()
-        .add_systems(Startup, (setup_camera, spawn_initial_piece, setup_ui, setup_game_over_ui)) // Add setup_game_over_ui here
-        .add_systems(Update, (handle_input, draw_blocks, clear_lines, update_score_display, update_gravity_speed, update_level_display)) // Add update_level_display here
-        .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
+        .add_systems(
+            Startup,
+            (
+                setup_camera,
+                spawn_initial_piece,
+                setup_ui,
+                setup_game_over_ui,
+            ),
+        ) // Add setup_game_over_ui here
+        .add_systems(
+            Update,
+            (
+                handle_input,
+                draw_blocks,
+                clear_lines,
+                update_score_display,
+                update_gravity_speed,
+                update_level_display,
+            ),
+        ) // Add update_level_display here
+        .add_systems(
+            FixedUpdate,
+            move_piece_down.run_if(in_state(GameState::Playing)),
+        )
         .run();
 }
 
@@ -65,15 +86,19 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(Camera2dBundle::default());
 }
 
-fn spawn_initial_piece(mut commands: Commands, game_map: Res<GameMap>, mut game_state: ResMut<NextState<GameState>>) {
+fn spawn_initial_piece(
+    mut commands: Commands,
+    game_map: Res<GameMap>,
+    mut game_state: ResMut<NextState<GameState>>,
+) {
     let new_piece = Piece::random();
-    let initial_position = Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 };
+    let initial_position = Position {
+        x: NUM_BLOCKS_X as isize / 2 - 1,
+        y: 0,
+    };
 
     if can_move(&new_piece, &initial_position, initial_position.y, &game_map) {
-        commands.spawn(( 
-            new_piece,
-            initial_position,
-        ));
+        commands.spawn((new_piece, initial_position));
         println!("Spawned initial piece (random)");
     } else {
         println!("Game Over! Cannot spawn new piece.");
@@ -104,8 +129,11 @@ fn draw_blocks(
                         ..default()
                     },
                     transform: Transform::from_xyz(
-                        (x as f32 * TEXTURE_SIZE as f32) - (WIDTH as f32 / 2.0) + (TEXTURE_SIZE as f32 / 2.0),
-                        (HEIGHT as f32 / 2.0) - (y as f32 * TEXTURE_SIZE as f32) - (TEXTURE_SIZE as f32 / 2.0),
+                        (x as f32 * TEXTURE_SIZE as f32) - (WIDTH as f32 / 2.0)
+                            + (TEXTURE_SIZE as f32 / 2.0),
+                        (HEIGHT as f32 / 2.0)
+                            - (y as f32 * TEXTURE_SIZE as f32)
+                            - (TEXTURE_SIZE as f32 / 2.0),
                         0.0,
                     ),
                     ..default()
@@ -127,8 +155,12 @@ fn draw_blocks(
                             ..default()
                         },
                         transform: Transform::from_xyz(
-                            ((position.x + mx as isize) as f32 * TEXTURE_SIZE as f32) - (WIDTH as f32 / 2.0) + (TEXTURE_SIZE as f32 / 2.0),
-                            (HEIGHT as f32 / 2.0) - ((position.y + my as isize) as f32 * TEXTURE_SIZE as f32) - (TEXTURE_SIZE as f32 / 2.0),
+                            ((position.x + mx as isize) as f32 * TEXTURE_SIZE as f32)
+                                - (WIDTH as f32 / 2.0)
+                                + (TEXTURE_SIZE as f32 / 2.0),
+                            (HEIGHT as f32 / 2.0)
+                                - ((position.y + my as isize) as f32 * TEXTURE_SIZE as f32)
+                                - (TEXTURE_SIZE as f32 / 2.0),
                             0.0,
                         ),
                         ..default()
@@ -168,7 +200,11 @@ fn move_piece_down(
                     if let Presence::Yes(color) = piece_matrix[my][mx] {
                         let map_x = position.x + mx as isize;
                         let map_y = position.y + my as isize;
-                        if map_x >= 0 && map_x < NUM_BLOCKS_X as isize && map_y >= 0 && map_y < NUM_BLOCKS_Y as isize {
+                        if map_x >= 0
+                            && map_x < NUM_BLOCKS_X as isize
+                            && map_y >= 0
+                            && map_y < NUM_BLOCKS_Y as isize
+                        {
                             game_map.0[map_y as usize][map_x as usize] = Presence::Yes(color);
                         }
                     }
@@ -176,9 +212,13 @@ fn move_piece_down(
             }
             commands.entity(entity).despawn(); // Despawn the piece entity
             // TODO: Trigger line clearing
-            commands.spawn(( // Spawn new piece
+            commands.spawn((
+                // Spawn new piece
                 Piece::random(),
-                Position { x: NUM_BLOCKS_X as isize / 2 - 1, y: 0 },
+                Position {
+                    x: NUM_BLOCKS_X as isize / 2 - 1,
+                    y: 0,
+                },
             ));
             println!("Piece landed at y: {}", position.y);
             println!("Piece finalized and added to game map.");
@@ -275,13 +315,60 @@ impl Piece {
     }
 }
 
-fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
-    if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowLeft) {
-        println!("Left key pressed");
+fn can_move_horizontally(
+    piece: &Piece,
+    current_pos: &Position,
+    new_x: isize,
+    game_map: &GameMap,
+) -> bool {
+    let piece_matrix = get_block_matrix(piece.states[piece.current_state]);
+    for my in 0..4 {
+        for mx in 0..4 {
+            if let Presence::Yes(_) = piece_matrix[my][mx] {
+                let block_x = new_x + mx as isize;
+                let block_y = current_pos.y + my as isize;
+
+                // Check collision with side boundaries
+                if block_x < 0 || block_x >= NUM_BLOCKS_X as isize {
+                    return false;
+                }
+
+                // Check collision with existing blocks on the game map
+                if block_y >= 0
+                    && block_y < NUM_BLOCKS_Y as isize
+                    && block_x >= 0
+                    && block_x < NUM_BLOCKS_X as isize
+                {
+                    if let Presence::Yes(_) = game_map.0[block_y as usize][block_x as usize] {
+                        return false;
+                    }
+                }
+            }
+        }
     }
-    if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowRight) {
-        println!("Right key pressed");
+    true
+}
+
+fn handle_input(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<(&mut Position, &Piece)>,
+    game_map: Res<GameMap>,
+) {
+    if let Ok((mut position, piece)) = query.get_single_mut() {
+        if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowLeft) {
+            let new_x = position.x - 1;
+            if can_move_horizontally(piece, &position, new_x, &game_map) {
+                position.x = new_x;
+            }
+        }
+        if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowRight) {
+            let new_x = position.x + 1;
+            if can_move_horizontally(piece, &position, new_x, &game_map) {
+                position.x = new_x;
+            }
+        }
     }
+
     if keyboard_input.just_pressed(bevy::input::keyboard::KeyCode::ArrowUp) {
         println!("Up key pressed");
     }
@@ -294,7 +381,8 @@ fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
 }
 
 // New system to clear full lines
-fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>, mut level: ResMut<Level>) { // Add level as a parameter
+fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>, mut level: ResMut<Level>) {
+    // Add level as a parameter
     let mut lines_cleared = 0;
     let mut rows_to_clear = Vec::new();
 
@@ -313,7 +401,8 @@ fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>, mut leve
     }
 
     // Clear lines and shift down
-    for &row_to_clear in rows_to_clear.iter().rev() { // Iterate in reverse to avoid index issues
+    for &row_to_clear in rows_to_clear.iter().rev() {
+        // Iterate in reverse to avoid index issues
         lines_cleared += 1;
         // Remove the full row
         game_map.0.remove(row_to_clear);
@@ -324,17 +413,21 @@ fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>, mut leve
     if lines_cleared > 0 {
         score.value += lines_cleared as u32 * 100; // Example scoring: 100 points per line
         level.lines_cleared_in_level += lines_cleared as u32;
-        if level.lines_cleared_in_level >= 10 { // Advance level every 10 lines
+        if level.lines_cleared_in_level >= 10 {
+            // Advance level every 10 lines
             level.value += 1;
             level.lines_cleared_in_level = 0;
         }
-        println!("Cleared {} lines! Current score: {}", lines_cleared, score.value);
+        println!(
+            "Cleared {} lines! Current score: {}",
+            lines_cleared, score.value
+        );
     }
 }
 
 // New system to set up UI
 fn setup_ui(mut commands: Commands) {
-    commands.spawn(( 
+    commands.spawn((
         TextBundle::from_sections([
             TextSection::new(
                 "Score: ",
@@ -389,7 +482,7 @@ struct GameOverMessage;
 
 // New system to set up Game Over UI
 fn setup_game_over_ui(mut commands: Commands) {
-    commands.spawn(( 
+    commands.spawn((
         TextBundle::from_section(
             "GAME OVER",
             TextStyle {
@@ -421,10 +514,7 @@ fn display_game_over_message(
 }
 
 // New system to update gravity speed based on level
-fn update_gravity_speed(
-    level: Res<Level>,
-    mut fixed_time: ResMut<Time<Fixed>>,
-) {
+fn update_gravity_speed(level: Res<Level>, mut fixed_time: ResMut<Time<Fixed>>) {
     if level.is_changed() {
         let new_speed = 1.0 - (level.value as f32 * 0.05); // Example: speed up by 5% per level
         fixed_time.set_wrap_period(Duration::from_secs_f32(new_speed.max(0.1))); // Minimum speed
