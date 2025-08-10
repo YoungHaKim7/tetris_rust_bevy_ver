@@ -25,6 +25,10 @@ pub struct Score {
     pub value: u32,
 }
 
+// New marker component for score display
+#[derive(Component)]
+struct ScoreDisplay;
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(GameColor::Gray.into()))
@@ -314,7 +318,7 @@ fn clear_lines(mut game_map: ResMut<GameMap>, mut score: ResMut<Score>) {
 
 // New system to set up UI
 fn setup_ui(mut commands: Commands) {
-    commands.spawn(
+    commands.spawn((
         TextBundle::from_sections([
             TextSection::new(
                 "Score: ",
@@ -336,11 +340,12 @@ fn setup_ui(mut commands: Commands) {
             left: Val::Px(10.0),
             ..default()
         }),
-    );
+        ScoreDisplay,
+    ));
 }
 
 // New system to update score display
-fn update_score_display(score: Res<Score>, mut query_text: Query<&mut Text>) {
+fn update_score_display(score: Res<Score>, mut query_text: Query<&mut Text, With<ScoreDisplay>>) {
     if score.is_changed() {
         if let Some(mut text) = query_text.iter_mut().next() {
             text.sections[1].value = score.value.to_string();
