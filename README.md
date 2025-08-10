@@ -1,6 +1,6 @@
-# tetris_rust_bevy_ver# Result
+# tetris_rust_bevy_ver
 
 ```bash
-
+cargo r --release
 ```
 
