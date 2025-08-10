@@ -1,6 +1,8 @@
 use crate::components::{Piece, Position};
 use crate::game_color::GameColor;
-use crate::game_constants::{HEIGHT, NUM_BLOCKS_X, NUM_BLOCKS_Y, TEXTURE_SIZE, TITLE, WIDTH};
+use crate::game_constants::{
+    HEIGHT, LEVEL_TIMES, NUM_BLOCKS_X, NUM_BLOCKS_Y, NUM_LEVELS, TEXTURE_SIZE, TITLE, WIDTH,
+};
 use crate::game_types::{GameMap, PieceMatrix, PieceType, Presence};
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
@@ -54,6 +56,7 @@ fn main() {
         .init_resource::<GameMap>()
         .init_resource::<Score>() // Add Score resource
         .init_resource::<Level>() // Add Level resource
+        .insert_resource(Time::<Fixed>::from_seconds(2.0))
         .init_state::<GameState>()
         .add_systems(
             Startup,
@@ -62,6 +65,7 @@ fn main() {
                 spawn_initial_piece,
                 setup_ui,
                 setup_game_over_ui,
+                update_gravity_speed,
             ),
         ) // Add setup_game_over_ui here
         .add_systems(
@@ -516,9 +520,13 @@ fn display_game_over_message(
 // New system to update gravity speed based on level
 fn update_gravity_speed(level: Res<Level>, mut fixed_time: ResMut<Time<Fixed>>) {
     if level.is_changed() {
-        let new_speed = 1.0 - (level.value as f32 * 0.05); // Example: speed up by 5% per level
-        fixed_time.set_wrap_period(Duration::from_secs_f32(new_speed.max(0.1))); // Minimum speed
-        println!("Gravity speed updated to: {}s", new_speed.max(0.1));
+        let level_index = level.value as usize;
+        if level_index < NUM_LEVELS {
+            let new_speed_ms = LEVEL_TIMES[level_index];
+            let new_speed_secs = new_speed_ms as f32 / 1000.0;
+            fixed_time.set_wrap_period(Duration::from_secs_f32(new_speed_secs));
+            println!("Gravity speed updated to: {}s", new_speed_secs);
+        }
     }
 }
 
