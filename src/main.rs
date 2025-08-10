@@ -11,6 +11,13 @@ mod game_color;
 mod game_types;
 mod components;
 
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+enum GameState {
+    #[default]
+    Playing,
+    GameOver,
+}
+
 fn main() {
     App::new()
         .insert_resource(ClearColor(GameColor::Gray.into()))
@@ -23,8 +30,11 @@ fn main() {
             ..default()
         }))
         .init_resource::<GameMap>()
+        .init_state::<GameState>()
         .add_systems(Startup, (setup_camera, spawn_initial_piece))
         .add_systems(Update, (handle_input, draw_blocks))
+        .add_systems(FixedUpdate, move_piece_down.run_if(in_state(GameState::Playing)))
+        .insert_resource(Time::<Fixed>::from_seconds(1.0))
         .run();
 }
 
@@ -44,16 +54,19 @@ fn spawn_initial_piece(mut commands: Commands) {
     println!("Spawned initial piece (placeholder)");
 }
 
+// System to draw blocks
 fn draw_blocks(
     mut commands: Commands,
     game_map: Res<GameMap>,
     query_piece: Query<(&Piece, &Position)>,
     query_existing_blocks: Query<Entity, With<Sprite>>,
 ) {
+    // Despawn all existing block sprites to redraw
     for entity in query_existing_blocks.iter() {
         commands.entity(entity).despawn();
     }
 
+    // Draw GameMap blocks
     for y in 0..NUM_BLOCKS_Y {
         for x in 0..NUM_BLOCKS_X {
             if let Presence::Yes(color) = game_map.0[y][x] {
@@ -74,8 +87,9 @@ fn draw_blocks(
         }
     }
 
+    // Draw current piece blocks
     if let Ok((piece, position)) = query_piece.get_single() {
-        let piece_matrix = get_block_matrix(piece.states[piece.current_state]);
+        let piece_matrix = get_block_matrix(piece.states[piece.current_state]); // Helper function needed
         for my in 0..4 {
             for mx in 0..4 {
                 if let Presence::Yes(color) = piece_matrix[my][mx] {
@@ -98,14 +112,22 @@ fn draw_blocks(
     }
 }
 
+// Helper function to convert u16 to PieceMatrix (copied from original piece.rs)
 fn get_block_matrix(num: u16) -> PieceMatrix {
     let mut res = [[Presence::No; 4]; 4];
     for i in 0..16 {
         if num & (1u16 << (15 - i)) > 0 {
-            res[i / 4][i % 4] = Presence::Yes(GameColor::Red);
+            res[i / 4][i % 4] = Presence::Yes(GameColor::Red); // Default to Red for now, will use piece.color later
         }
     }
     res
+}
+
+fn move_piece_down(mut query_piece: Query<&mut Position, With<Piece>>) {
+    if let Ok(mut position) = query_piece.get_single_mut() {
+        position.y += 1; // Move down by one block
+        println!("Piece moved down to y: {}", position.y);
+    }
 }
 
 fn handle_input(keyboard_input: Res<ButtonInput<KeyCode>>) {
